@@ -75,14 +75,22 @@ async def llm_mode():
     client = genai.Client(api_key=api_key)
     
     # Connect to MCP Server via SSE
-    # Make sure the server is running: python MCP_server/MCP_server.py --transport sse
-    mcp_url = "http://localhost:8000/sse"
+    # Connect to MCP Server via SSE
+    # Make sure the server is running: python MCP_server.py --transport sse
+    # mcp_url = "http://localhost:8000/sse"
+    mcp_url = "https://analysis-fire-mcp.fastmcp.app/mcp" # Horizon deployment URL
+    
+    horizon_api_key = os.getenv("HORIZON_API_KEY")
+    headers = {}
+    if horizon_api_key:
+        headers["Authorization"] = f"Bearer {horizon_api_key}"
+        print(f"🔑 Using HORIZON_API_KEY for authentication")
     
     print(f"🔌 Connecting to MCP Server at {mcp_url}...")
     
     from mcp.client.sse import sse_client
     
-    async with sse_client(mcp_url) as (read, write):
+    async with sse_client(mcp_url, headers=headers) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             

@@ -322,22 +322,22 @@ def search_by_criteria(criteria: str) -> Dict[str, Any]:
         "applied_filters": filters
     }
 
-# if __name__ == "__main__":
-#     import argparse
-#     import sys
+if __name__ == "__main__":
+    import argparse
+    import sys
     
-#     # Define arguments
-#     parser = argparse.ArgumentParser(description="Shapes Database MCP Server")
-#     parser.add_argument("--transport", default="sse", choices=["stdio", "sse"], help="Transport protocol: 'sse' (default) or 'stdio'")
-#     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (for SSE) - default: 0.0.0.0")
-#     parser.add_argument("--port", type=int, default=8000, help="Port to bind to (for SSE) - default: 8000")
+    # Define arguments
+    parser = argparse.ArgumentParser(description="Shapes Database MCP Server")
+    parser.add_argument("--transport", default="sse", choices=["stdio", "sse"], help="Transport protocol: 'sse' (default) or 'stdio'")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (for SSE) - default: 0.0.0.0")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (for SSE) - default: 8000")
     
-#     args = parser.parse_args()
+    args = parser.parse_args()
     
-#     if args.transport == "sse":
-#         print(f"Starting MCP server on http://{args.host}:{args.port}/sse", file=sys.stderr)
-#         print(f"Health check available at http://{args.host}:{args.port}/health", file=sys.stderr)
-#         mcp.run(transport="sse", host=args.host, port=args.port)
-#     else:
-#         # Default to stdio for local editor integration
-#         mcp.run(transport="stdio")
+    if args.transport == "sse":
+        print(f"Starting MCP server on http://{args.host}:{args.port}/sse", file=sys.stderr)
+        print(f"Health check available at http://{args.host}:{args.port}/health", file=sys.stderr)
+        mcp.run(transport="sse", host=args.host, port=args.port)
+    else:
+        # Default to stdio for local editor integration
+        mcp.run(transport="stdio")
