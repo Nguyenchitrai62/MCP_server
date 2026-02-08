@@ -1,8 +1,0 @@
-fastmcp
-fastapi
-uvicorn
-pydantic
-python-dotenv
-google-genai
-mcp
-openai
