@@ -773,6 +773,7 @@
     let activeToolId = null; // Track current tool call ID
     let toolCallsData = {}; // Store data for tool calls: { id: { name, args, result, status } }
     let toolCallCounter = 0; // Simple ID generator if needed
+    let mcpStatuses = {};
 
     // --- MCP List Management ---
     function renderMcpList() {
@@ -783,12 +784,71 @@
             // Show only part of URL if too long? For now just show full but with ellipsis
             div.title = url;
             const displayUrl = url.replace(/^https?:\/\//, '');
+            
+            // Status dot
+            let statusColor = 'var(--text-secondary)'; // default/loading
+            let statusTitle = 'Checking...';
+            
+            if (mcpStatuses[url] === true) {
+                statusColor = 'var(--success)';
+                statusTitle = 'Connected';
+            } else if (mcpStatuses[url] === false) {
+                statusColor = 'var(--error)';
+                statusTitle = 'Connection Failed';
+            }
+
             div.innerHTML = `
-                <span style="font-family: var(--font-code);">${displayUrl}</span>
+                <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+                    <span id="status-${index}" style="width:8px; height:8px; border-radius:50%; background:${statusColor}; flex-shrink:0;" title="${statusTitle}"></span>
+                    <span style="font-family: var(--font-code); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${displayUrl}</span>
+                </div>
                 <button onclick="removeMcpUrl(${index})">×</button>
             `;
             els.mcpList.appendChild(div);
         });
+    }
+
+    async function checkMcpStatus(url) {
+        try {
+            // Use Backend API to verify connection
+            // Assuming BACKEND_URL is like ".../chat", we want ".../check-mcp"
+            const checkUrl = BACKEND_URL.replace(/\/chat\/?$/, "/check-mcp");
+            
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 10000); // 10s wait for backend
+            
+            const res = await fetch(checkUrl, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url }),
+                signal: controller.signal 
+            });
+            clearTimeout(id);
+            
+            if (!res.ok) {
+                 throw new Error(`Backend Status ${res.status}`);
+            }
+            
+            const data = await res.json();
+            if (data.status === 'connected') {
+                mcpStatuses[url] = true;
+            } else {
+                console.warn("Backend check returned error", data);
+                mcpStatuses[url] = false;
+            }
+        } catch (e) {
+            console.warn("Check failed via backend", url, e);
+            mcpStatuses[url] = false;
+        }
+        renderMcpList();
+    }
+
+    function checkAllMcpStatus() {
+        mcpUrls.forEach((url) => {
+             if (mcpStatuses[url] === undefined) mcpStatuses[url] = null; 
+             checkMcpStatus(url);
+        });
+        renderMcpList(); 
     }
 
     function addMcpUrl() {
@@ -796,12 +856,15 @@
         if (url && !mcpUrls.includes(url)) {
             mcpUrls.push(url);
             els.newMcpUrl.value = '';
+            checkMcpStatus(url); // Check the new one
             renderMcpList();
         }
     }
 
     function removeMcpUrl(index) {
+        const urlObj = mcpUrls[index];
         mcpUrls.splice(index, 1);
+        if (urlObj && typeof urlObj === 'string') delete mcpStatuses[urlObj];
         renderMcpList();
     }
     
@@ -817,6 +880,7 @@
     
     // Initial Render
     renderMcpList();
+    checkAllMcpStatus();
     
     // --- Modal Logic ---
     function openModal() {

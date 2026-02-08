@@ -367,5 +367,31 @@ async def chat_endpoint(req: ChatRequest):
         
     return StreamingResponse(chat_process(req.message, urls, req.provider, req.model, req.api_key, req.base_url), media_type="text/event-stream")
 
+class CheckMcpRequest(BaseModel):
+    url: str
+
+@app.post("/check-mcp")
+async def check_mcp(req: CheckMcpRequest):
+    """
+    Checks if an MCP server is reachable and valid via SSE.
+    """
+    url = req.url.strip()
+    if not url:
+        return {"status": "error", "message": "Empty URL"}
+        
+    try:
+        # Use a short timeout for the check
+        async def try_connect():
+            async with sse_client(url) as _:
+                pass # If we enter context, connection is successful
+                
+        await asyncio.wait_for(try_connect(), timeout=5.0)
+        return {"status": "connected", "message": "Successfully connected"}
+        
+    except asyncio.TimeoutError:
+         return {"status": "error", "message": "Connection timed out"}
+    except Exception as e:
+         return {"status": "error", "message": f"Connection failed: {str(e)}"}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=9000)
