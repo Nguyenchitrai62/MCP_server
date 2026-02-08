@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Client Interface</title>
+    <!-- Google Fonts for Premium Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Premium Dark Theme Palette */
+            --bg-color: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-glass: rgba(30, 41, 59, 0.7);
+            --accent-primary: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --accent-secondary: #8b5cf6;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --success: #10b981;
+            --error: #ef4444;
+            --font-main: 'Outfit', sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08) 0%, transparent 25%);
+        }
+
+        /* Utility Classes */
+        .glass {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .scroll-bar::-webkit-scrollbar { width: 6px; }
+        .scroll-bar::-webkit-scrollbar-track { background: transparent; }
+        .scroll-bar::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        .scroll-bar::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+        /* Sidebar */
+        aside {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.8);
+            z-index: 10;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        
+        .modal {
+            background: #1e293b;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            transform: scale(0.95);
+            transition: transform 0.2s;
+        }
+        .modal-overlay.open .modal { transform: scale(1); }
+        
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title { font-weight: 600; color: var(--text-primary); }
+        .modal-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem; }
+        .modal-body { padding: 20px; }
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex; justify-content: flex-end; gap: 10px;
+        }
+
+        aside header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+
+        .config-section {
+            padding: 24px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-code);
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        button.primary-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        button.primary-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        button.primary-btn:active {
+            transform: translateY(0);
+        }
+
+        button.secondary-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-top: 8px;
+            width: 100%;
+        }
+
+        button.secondary-btn:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 6px;
+            background: var(--text-secondary);
+        }
+
+        .status-badge.connected .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .status-badge.connected { color: var(--success); background: rgba(16, 185, 129, 0.1); }
+        
+        .status-badge.error .status-dot { background: var(--error); }
+        .status-badge.error { color: var(--error); background: rgba(239, 68, 68, 0.1); }
+
+        /* Right Sidebar */
+        .right-sidebar {
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--border-color);
+            background: rgba(15, 23, 42, 0.8);
+            z-index: 10;
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .right-sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .right-sidebar-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .tool-details-panel {
+            padding: 0;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        .tool-detail-section {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Updated Tool Call Summary in Chat */
+        .tool-call-summary {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 12px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid var(--accent-secondary);
+        }
+
+        .tool-call-summary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+        }
+
+        .tool-call-summary.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--accent-primary);
+        }
+
+        .tool-call-summary.active-selection {
+             background: rgba(59, 130, 246, 0.2); 
+             border-color: var(--accent-primary);
+             box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+
+
+
+        /* Tools List */
+        .tools-list {
+            margin-top: 24px;
+        }
+
+        .tools-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-family: var(--font-code);
+        }
+
+        .tool-item:hover {
+            border-color: var(--accent-primary);
+            background: rgba(59, 130, 246, 0.05);
+            color: var(--text-primary);
+        }
+
+        .tool-icon { margin-right: 8px; font-size: 1rem; }
+
+        /* Custom Select Style */
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px top 50%;
+            background-size: 12px auto;
+            cursor: pointer;
+        }
+
+        select:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+            background-color: var(--bg-secondary);
+        }
+
+        /* MCP URL Tags */
+        .mcp-tag {
+            background: rgba(255,255,255,0.05);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 4px;
+            width: 100%;
+        }
+        .mcp-tag span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .mcp-tag button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            border-radius: 4px;
+        }
+        .mcp-tag button:hover {
+            color: var(--error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Main Chat Area */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-container {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        .message.user .avatar { background: var(--accent-primary); color: white; }
+        .message.ai .avatar { background: linear-gradient(135deg, #c084fc, #ec4899); color: white; }
+        .message.system .avatar { background: var(--border-color); color: var(--text-secondary); }
+
+        .message-content {
+            padding: 16px 20px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            line-height: 1.6;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            white-space: pre-wrap; /* Preserve newlines */
+        }
+
+        .message.user .message-content {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.2);
+            border-top-left-radius: 2px;
+        }
+
+        .message.ai .message-content {
+            background: rgba(30, 41, 59, 0.6);
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 2px;
+        }
+
+
+        
+        .tool-content {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+        
+        .json-block {
+            background: #0d1117;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: var(--font-code);
+            color: #e6edf3;
+            margin-top: 6px;
+            white-space: pre-wrap;
+            border: 1px solid rgba(255,255,255,0.05);
+
+        }
+        
+        .label-text {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            display: block;
+            letter-spacing: 0.05em;
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Status Animations */
+        @keyframes pulse-dot { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+        .status-computing { animation: pulse-dot 1.5s infinite; color: var(--accent-primary); }
+
+
+        .tool-call {
+            margin-top: 12px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+        }
+
+        .tool-call-header {
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            color: var(--accent-secondary);
+        }
+
+        .tool-call-body { padding: 12px; color: #ccc; white-space: pre-wrap; }
+        .tool-call-result {
+            padding: 12px;
+            background: #0d121c;
+            border-top: 1px solid #333;
+            color: var(--success);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Input Area */
+        .input-area {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto 40px;
+            padding: 0 40px;
+            position: relative;
+        }
+
+        .chat-input-wrapper {
+            position: relative;
+            border-radius: 16px;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .chat-input-wrapper:focus-within {
+            box-shadow: 0 8px 32px rgba(59, 130, 246, 0.15);
+            border-color: var(--accent-primary);
+        }
+
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            padding: 14px 16px;
+            font-family: var(--font-main);
+            font-size: 1rem;
+            resize: none;
+            height: 52px;
+            max-height: 200px;
+            border-radius: 12px;
+        }
+
+        textarea:focus { outline: none; }
+
+        .send-btn {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            width: 36px;
+            height: 36px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover { background: #2563eb; transform: scale(1.05); }
+        .send-btn:disabled { background: #475569; cursor: not-allowed; }
+
+        /* Loading Indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 4px 8px;
+        }
+        .dot {
+            width: 4px;
+            height: 4px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        /* Markdown Styles */
+        .markdown-body pre { background: #111; padding: 12px; border-radius: 8px; overflow-x: auto; font-family: var(--font-code); font-size: 0.85em; }
+        .markdown-body code { background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 4px; font-family: var(--font-code); font-size: 0.9em; }
+        .markdown-body p { margin-bottom: 1em; }
+
+        .notification {
+            position: fixed; top: 20px; right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex; align-items: center; gap: 10px;
+            transform: translateX(120%);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .notification.show { transform: translateX(0); }
+        .notification.success { border-left: 4px solid var(--success); }
+        .notification.error { border-left: 4px solid var(--error); }
+    </style>
+</head>
+<body>
+
+<aside class="scroll-bar">
+    <header>
+        <div style="margin-bottom: 16px;">
+            <h1>MCP Client</h1>
+        </div>
+        <button id="settings-btn" class="secondary-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px;">
+            <span>⚙️</span> LLM Configuration
+        </button>
+    </header>
+
+    <div class="config-section">
+        <div class="input-group">
+            <label>MCP Server URLs</label>
+            <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                <input type="text" id="new-mcp-url" placeholder="Add URL..." style="flex:1; min-width: 0;">
+                <button id="add-mcp-btn" class="secondary-btn" style="width: auto; margin:0; padding: 0 12px; background: var(--bg-secondary);">+</button>
+            </div>
+            <div id="mcp-list" style="display: flex; flex-direction: column; gap: 6px;">
+                <!-- Tags will go here -->
+            </div>
+        </div>
+
+        <!-- Backend URL is hardcoded -->
+        <!-- <button class="primary-btn" id="connect-btn">Update Config</button> -->
+    </div>
+</aside>
+
+<main>
+    <div class="chat-container scroll-bar" id="chat-stream">
+
+    </div>
+
+    <div class="input-area">
+        <div class="chat-input-wrapper">
+            <textarea id="user-input" placeholder="Ask something..." rows="1" disabled></textarea>
+            <button id="send-btn" class="send-btn" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </div>
+    </div>
+</main>
+
+<aside class="right-sidebar" id="tool-details-sidebar">
+    <div class="right-sidebar-header">
+        <h2>Tool Details</h2>
+        <div style="font-size: 0.8rem; color: var(--text-secondary);">Select a tool call to view details</div>
+    </div>
+    <div id="tool-details-content" class="tool-details-panel">
+        <div style="text-align: center; color: var(--text-secondary); margin-top: 40px; font-size: 0.9rem;">
+            No tool selected
+        </div>
+    </div>
+</aside>
+
+
+<div id="notification-area"></div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">LLM Configuration</div>
+            <button class="modal-close" id="close-modal">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="input-group">
+                <label>Provider</label>
+                <div style="position: relative;">
+                    <select id="modal-provider" style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid var(--accent-primary); border-radius: 8px; color: var(--text-primary); font-size: 1rem; font-weight: 500; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                        <option value="openai" style="background: #1e293b; color: #f8fafc; padding: 10px;">OpenAI</option>
+                        <option value="gemini" style="background: #1e293b; color: #f8fafc; padding: 10px;">Google Gemini</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label>API Key <span style="font-weight:400; text-transform:none; color:var(--text-secondary);">(Optional if Base URL set)</span></label>
+                <input type="password" id="modal-api-key" placeholder="sk-..." autocomplete="off">
+            </div>
+            
+            <div class="input-group">
+                <label>Base URL <span style="font-weight:400; text-transform:none; color:var(--text-secondary);">(Optional)</span></label>
+                <input type="text" id="modal-base-url" placeholder="e.g. http://localhost:11434/v1">
+            </div>
+
+            <div class="input-group">
+                <label>Model Name</label>
+                <input type="text" id="modal-model" value="gemini-2.5-flash" placeholder="gemini-2.5-flash">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="secondary-btn" id="cancel-settings" style="width: auto;">Cancel</button>
+            <button class="primary-btn" id="save-settings" style="width: auto; padding: 8px 20px;">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Logic -->
+<script>
+    // --- Selectors ---
+    // --- Selectors ---
+    const els = {
+        settingsBtn: document.getElementById('settings-btn'),
+        modal: document.getElementById('settings-modal'),
+        closeModalBtn: document.getElementById('close-modal'),
+        cancelSettingsBtn: document.getElementById('cancel-settings'),
+        saveSettingsBtn: document.getElementById('save-settings'),
+        
+        // Modal Inputs
+        idxProvider: document.getElementById('modal-provider'),
+        idxApiKey: document.getElementById('modal-api-key'),
+        idxBaseUrl: document.getElementById('modal-base-url'),
+        idxModel: document.getElementById('modal-model'),
+        
+        newMcpUrl: document.getElementById('new-mcp-url'),
+        addMcpBtn: document.getElementById('add-mcp-btn'),
+        mcpList: document.getElementById('mcp-list'),
+        
+        chatStream: document.getElementById('chat-stream'),
+        userInput: document.getElementById('user-input'),
+        sendBtn: document.getElementById('send-btn'),
+        
+        toolDetailsSidebar: document.getElementById('tool-details-sidebar'),
+        toolDetailsContent: document.getElementById('tool-details-content'),
+    };
+
+    // --- State ---
+    const BACKEND_URL = "https://mcp-be.nguyenchitrai.id.vn/chat";
+    let mcpUrls = ["https://api.nguyenchitrai.id.vn/sse"];
+    
+    // Default Settings
+    let llmConfig = {
+        provider: "openai",
+        apiKey: "",
+        baseUrl: "http://54.213.248.28:8233/v1",
+        model: "openai/gpt-oss-20b"
+    };
+    
+    let isProcessing = false;
+    let activeToolId = null; // Track current tool call ID
+    let toolCallsData = {}; // Store data for tool calls: { id: { name, args, result, status } }
+    let toolCallCounter = 0; // Simple ID generator if needed
+
+    // --- MCP List Management ---
+    function renderMcpList() {
+        els.mcpList.innerHTML = '';
+        mcpUrls.forEach((url, index) => {
+            const div = document.createElement('div');
+            div.className = 'mcp-tag';
+            // Show only part of URL if too long? For now just show full but with ellipsis
+            div.title = url;
+            const displayUrl = url.replace(/^https?:\/\//, '');
+            div.innerHTML = `
+                <span style="font-family: var(--font-code);">${displayUrl}</span>
+                <button onclick="removeMcpUrl(${index})">×</button>
+            `;
+            els.mcpList.appendChild(div);
+        });
+    }
+
+    function addMcpUrl() {
+        const url = els.newMcpUrl.value.trim();
+        if (url && !mcpUrls.includes(url)) {
+            mcpUrls.push(url);
+            els.newMcpUrl.value = '';
+            renderMcpList();
+        }
+    }
+
+    function removeMcpUrl(index) {
+        mcpUrls.splice(index, 1);
+        renderMcpList();
+    }
+    
+    // Allow adding by pressing Enter in input
+    els.newMcpUrl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addMcpUrl();
+        }
+    });
+
+    els.addMcpBtn.addEventListener('click', addMcpUrl);
+    
+    // Initial Render
+    renderMcpList();
+    
+    // --- Modal Logic ---
+    function openModal() {
+        // Load current state into inputs
+        els.idxProvider.value = llmConfig.provider;
+        els.idxApiKey.value = llmConfig.apiKey;
+        els.idxBaseUrl.value = llmConfig.baseUrl;
+        els.idxModel.value = llmConfig.model;
+        
+        els.modal.classList.add('open');
+    }
+    
+    function closeModal() {
+        els.modal.classList.remove('open');
+    }
+    
+    function saveSettings() {
+        llmConfig = {
+            provider: els.idxProvider.value,
+            apiKey: els.idxApiKey.value,
+            baseUrl: els.idxBaseUrl.value.trim(),
+            model: els.idxModel.value.trim()
+        };
+        closeModal();
+        logEvent("Settings saved.");
+    }
+    
+    
+    els.settingsBtn.addEventListener('click', openModal);
+    els.closeModalBtn.addEventListener('click', closeModal);
+    els.cancelSettingsBtn.addEventListener('click', closeModal);
+    els.saveSettingsBtn.addEventListener('click', saveSettings);
+    
+    // Auto-fill defaults on provider change
+    els.idxProvider.addEventListener('change', () => {
+        const provider = els.idxProvider.value;
+        if (provider === 'openai') {
+            els.idxBaseUrl.value = "http://54.213.248.28:8233/v1";
+            els.idxModel.value = "openai/gpt-oss-20b";
+        } else if (provider === 'gemini') {
+            els.idxBaseUrl.value = "";
+            els.idxModel.value = "gemini-2.5-flash";
+        }
+    });
+
+    
+    // --- UI Helpers ---
+    function logEvent(msg) {
+        console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
+    }
+    
+    function addMessage(role, text) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${role}`;
+        
+        const avatar = role === 'user' ? '👤' : (role === 'ai' ? '🤖' : '⚙️');
+        const name = role === 'user' ? 'YOU' : (role === 'ai' ? 'ASSISTANT' : 'SYSTEM');
+        
+        msgDiv.innerHTML = `
+            <div class="message-header"> <div class="avatar">${avatar}</div> ${name} </div>
+            <div class="message-content">${text}</div>
+        `;
+        
+        els.chatStream.appendChild(msgDiv);
+        els.chatStream.scrollTop = els.chatStream.scrollHeight;
+        
+        return msgDiv.querySelector('.message-content');
+    }
+
+    // --- Interaction ---
+    els.userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    });
+
+    els.sendBtn.addEventListener('click', handleSend);
+    
+    // Enable input immediately
+    els.userInput.disabled = false;
+    els.sendBtn.disabled = false;
+    
+    // Auto-resize textarea
+    els.userInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+        if(this.value === '') this.style.height = '52px';
+    });
+
+    async function handleSend() {
+        if (isProcessing) return;
+        
+        const text = els.userInput.value.trim();
+        if (!text) return;
+        
+        // Reset Input
+        els.userInput.value = '';
+        els.userInput.style.height = '52px';
+        
+        addMessage("user", text);
+        
+        const aiMsgContent = addMessage("ai", ""); 
+        activeToolElement = null; // Reset tool state for new turn
+        
+        isProcessing = true;
+        els.userInput.disabled = true;
+        els.sendBtn.disabled = true;
+        
+        try {
+            logEvent("Sending request to Backend...");
+            
+            const response = await fetch(BACKEND_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    message: text,
+                    mcp_urls: mcpUrls,
+                    provider: llmConfig.provider,
+                    api_key: llmConfig.apiKey,
+                    base_url: llmConfig.baseUrl,
+                    model: llmConfig.model
+                })
+            });
+            
+            if (!response.ok) throw new Error(`Backend Error ${response.status}`);
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                
+                // Parse lines (SSE format: "data: ...\n\n")
+                const lines = buffer.split("\n\n");
+                buffer = lines.pop(); // Keep the last partial chunk
+                
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const jsonStr = line.replace("data: ", "").trim();
+                        if (!jsonStr) continue;
+                        if (jsonStr === "[DONE]") continue;
+
+                        try {
+                            const data = JSON.parse(jsonStr);
+                            handleEvent(data, aiMsgContent);
+                        } catch (e) {
+                            console.error("JSON Parse Error", e, jsonStr);
+                        }
+                    }
+                }
+            }
+            logEvent("Stream Complete.");
+            
+        } catch (err) {
+            logEvent(`Error: ${err.message}`);
+            aiMsgContent.innerHTML += `<br><span style="color:var(--error)">Error: ${err.message}</span>`;
+        } finally {
+            isProcessing = false;
+            els.userInput.disabled = false;
+            els.sendBtn.disabled = false;
+            els.userInput.focus();
+        }
+    }
+    
+    function handleEvent(data, container) {
+        if (data.type === 'text_chunk') {
+            const lastNode = container.lastChild;
+            if (lastNode && lastNode.nodeType === Node.TEXT_NODE) {
+                lastNode.textContent += data.content;
+            } else {
+                container.appendChild(document.createTextNode(data.content));
+            }
+            
+        } else if (data.type === 'tool_call') {
+            logEvent(`Tool Call: ${data.name}`);
+            
+            // Generate a unique ID for this tool call
+            const toolId = `tool-${Date.now()}-${toolCallCounter++}`;
+            activeToolId = toolId;
+            
+            // Store data
+            toolCallsData[toolId] = {
+                id: toolId,
+                name: data.name,
+                args: data.args,
+                status: 'running',
+                result: null
+            };
+            
+            // Create Summary UI in Chat
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = "tool-call-summary active";
+            summaryDiv.dataset.toolId = toolId;
+            summaryDiv.innerHTML = `
+                <div class="tool-badge">
+                    <span>Used Tool: <b style="color:var(--accent-secondary)">${data.name}</b></span>
+                </div>
+                <div class="status-indicator status-computing">Running...</div>
+            `;
+            
+            summaryDiv.addEventListener('click', () => showToolDetails(toolId));
+            
+            container.appendChild(summaryDiv);
+            
+            // Automatically show details
+            showToolDetails(toolId);
+            
+        } else if (data.type === 'tool_result') {
+             logEvent(`Tool Result: ${data.name}`);
+             
+             // Update Data
+             // We assume the result belongs to the active tool call (sequential assumption)
+             // or we need to find the last running tool with this name?
+             // Since we have activeToolId, we use it. 
+             // Ideally backend should provide ID, but we are using local state.
+             
+             if (activeToolId && toolCallsData[activeToolId].name === data.name) {
+                 const toolData = toolCallsData[activeToolId];
+                 toolData.result = data.result;
+                 toolData.status = 'completed';
+                 
+                 // Update Chat Summary UI
+                 const summaryDiv = document.querySelector(`.tool-call-summary[data-tool-id="${activeToolId}"]`);
+                 if (summaryDiv) {
+                     summaryDiv.classList.remove('active');
+                     const statusInd = summaryDiv.querySelector('.status-indicator');
+                     statusInd.textContent = "Completed";
+                     statusInd.className = "status-indicator"; 
+                     statusInd.style.color = "var(--success)";
+                     summaryDiv.style.borderLeftColor = "var(--success)";
+                 }
+                 
+                 // Refresh Sidebar if viewing this tool
+                 const currentViewId = els.toolDetailsContent.dataset.viewingId;
+                 if (currentViewId === activeToolId) {
+                     renderToolDetails(activeToolId);
+                 }
+                 
+                 activeToolId = null; // Clear active
+             } else {
+                 // Fallback if matching fails
+                 console.warn("Could not match tool result to call", data);
+             }
+             
+        } else if (data.type === 'status') {
+            logEvent(`Status: ${data.content}`);
+        } else if (data.type === 'error') {
+            logEvent(`Error: ${data.content}`);
+            const errDiv = document.createElement('div');
+            errDiv.style.color = "var(--error)";
+            errDiv.textContent = `\nError: ${data.content}`;
+            container.appendChild(errDiv);
+            
+             // Mark active tool as error if exists
+             if (activeToolId) {
+                 toolCallsData[activeToolId].status = 'error';
+                 const summaryDiv = document.querySelector(`.tool-call-summary[data-tool-id="${activeToolId}"]`);
+                 if (summaryDiv) {
+                     const statusInd = summaryDiv.querySelector('.status-indicator');
+                     statusInd.textContent = "Error";
+                     statusInd.className = "status-indicator";
+                     statusInd.style.color = "var(--error)";
+                     summaryDiv.style.borderLeftColor = "var(--error)";
+                 }
+                 if (els.toolDetailsContent.dataset.viewingId === activeToolId) {
+                     renderToolDetails(activeToolId);
+                 }
+                 activeToolId = null;
+             }
+        }
+        
+        // Auto Scroll
+        const chatContainer = els.chatStream;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function showToolDetails(toolId) {
+        // Highlight selected summary
+        document.querySelectorAll('.tool-call-summary').forEach(el => el.classList.remove('active-selection'));
+        const summary = document.querySelector(`.tool-call-summary[data-tool-id="${toolId}"]`);
+        if (summary) summary.classList.add('active-selection'); // We need CSS for this or reuse 'active' which I used for running state. 
+        // Let's rely on .active for running and add a border or background for selection?
+        // Actually, let's keep it simple. Just render.
+        
+        renderToolDetails(toolId);
+    }
+
+    function renderToolDetails(toolId) {
+        const data = toolCallsData[toolId];
+        if (!data) return;
+        
+        els.toolDetailsContent.dataset.viewingId = toolId;
+        
+        // Format Args
+        const argsStr = JSON.stringify(data.args, null, 2);
+        
+        // Format Result
+        let resultStr = "Waiting for output...";
+        if (data.status === 'completed' || data.status === 'error') {
+            try {
+                 let obj = data.result;
+                 if (typeof data.result === 'string') {
+                     if (data.result.trim().startsWith('{') || data.result.trim().startsWith('[')) {
+                        obj = JSON.parse(data.result);
+                     }
+                 }
+                 resultStr = JSON.stringify(obj, null, 2);
+            } catch (e) {
+                resultStr = String(data.result);
+            }
+        }
+        
+        els.toolDetailsContent.innerHTML = `
+            <div class="tool-detail-section">
+                <span class="label-text" style="color:var(--accent-primary); font-size:0.9rem;">${data.name}</span>
+                <div class="status-badge ${data.status === 'completed' ? 'connected' : (data.status === 'error' ? 'error' : '')}" style="margin-top:0;">
+                    <span class="status-dot"></span> ${data.status.toUpperCase()}
+                </div>
+            </div>
+            
+            <div class="tool-detail-section">
+                <span class="label-text">Input Arguments</span>
+                <div class="json-block">${argsStr}</div>
+            </div>
+            
+            <div class="tool-detail-section">
+                <span class="label-text">Result</span>
+                <div class="json-block" style="color: ${data.status==='error'?'var(--error)':'#e6edf3'}">${resultStr}</div>
+            </div>
+        `;
+    }
+</script>
+</body>
+</html>
+
