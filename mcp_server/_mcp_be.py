@@ -506,6 +506,10 @@ async def check_mcp(req: CheckMcpRequest):
          return {"status": "error", "message": "Connection timed out"}
     except Exception as e:
          return {"status": "error", "message": f"Connection failed: {str(e)}"}
+     
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=9000)

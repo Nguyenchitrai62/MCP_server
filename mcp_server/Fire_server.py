@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 mcp = FastMCP("Shapes Database Server")
 
 # Load shapes database
-SHAPES_DB_PATH = r"D:\Source_code\MCP_server\39_shapes.json"
+SHAPES_DB_PATH = r"MCP_server\39_shapes.json"
 shapes_database = []
 
 def load_shapes_database():
