@@ -26,11 +26,17 @@ DEFAULT_MCP_SERVER_URL = "https://api.nguyenchitrai.id.vn/sse"
 DEFAULT_MCP_SERVER_URL = "https://api.nguyenchitrai.id.vn/sse"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 try:
     from openai import AsyncOpenAI
 except ImportError:
     AsyncOpenAI = None
+
+try:
+    from groq import AsyncGroq
+except ImportError:
+    AsyncGroq = None
 
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY not set!")
@@ -118,6 +124,18 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
              return
              
          client = AsyncOpenAI(api_key=key, base_url=base_url)
+
+    elif provider == "groq":
+         if AsyncGroq is None:
+             yield f"data: {json.dumps({'type': 'error', 'content': 'groq module not installed. pip install groq'})}\n\n"
+             return
+        
+         key = api_key or GROQ_API_KEY
+         if not key:
+             yield f"data: {json.dumps({'type': 'error', 'content': 'GROQ_API_KEY not set'})}\n\n"
+             return
+        
+         client = AsyncGroq(api_key=key)
          
     else:
         yield f"data: {json.dumps({'type': 'error', 'content': f'Unknown provider: {provider}'})}\n\n"
@@ -241,6 +259,102 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
                             )
                             current_message = response_part
 
+                            current_message = response_part
+
+            # --- GROQ PATH ---
+            elif provider == "groq":
+                messages = [
+                    {"role": "viewer", "content": "You are a helpful assistant."}, # Groq often prefers system or user/assistant. 'viewer' is a weird role? No, system.
+                    {"role": "system", "content": "Use the tools to answer the questions."},
+                    {"role": "user", "content": user_message}
+                ]
+                # Remove the 'viewer' role if it's not standard. OpenAI uses 'system'.
+                messages = [
+                    {"role": "system", "content": "Use the tools to answer the questions."},
+                    {"role": "user", "content": user_message}
+                ]
+                
+                groq_tools = []
+                if all_tools:
+                    groq_tools = [
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": t.name,
+                                "description": t.description,
+                                "parameters": t.inputSchema,
+                            },
+                        }
+                        for t in all_tools
+                    ]
+                
+                max_turns = 5
+                
+                for _ in range(max_turns):
+                    create_args = {
+                        "model": model or "qwen/qwen3-32b",
+                        "messages": messages,
+                    }
+                    if groq_tools:
+                        create_args["tools"] = groq_tools
+                        create_args["tool_choice"] = "auto"
+                    
+                    yield f"data: {json.dumps({'type': 'status', 'content': 'Thinking (Groq)...'})}\n\n"
+                    
+                    response = await client.chat.completions.create(**create_args)
+                    response_message = response.choices[0].message
+                    
+                    if response.choices[0].finish_reason == "tool_calls":
+                        messages.append(response_message)
+                        
+                        for tool_call in response_message.tool_calls:
+                            tool_name = tool_call.function.name
+                            tool_args_str = tool_call.function.arguments
+                            tool_call_id = tool_call.id
+                            
+                            try:
+                                tool_args = json.loads(tool_args_str)
+                            except json.JSONDecodeError:
+                                tool_args = {}
+
+                            yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'args': tool_args})}\n\n"
+                            yield f"data: {json.dumps({'type': 'status', 'content': f'Executing {tool_name}...'})}\n\n"
+                            
+                            try:
+                                session = tool_to_session.get(tool_name)
+                                if not session: raise ValueError(f"No session found for {tool_name}")
+                                
+                                result = await session.call_tool(tool_name, arguments=tool_args)
+                                
+                                tool_output = ""
+                                if hasattr(result, 'content') and result.content:
+                                    tool_output = "".join([c.text for c in result.content if hasattr(c, "text")])
+                                else:
+                                    tool_output = str(result)
+                                
+                                yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'result': tool_output})}\n\n"
+                                
+                                messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": tool_call_id,
+                                    "content": tool_output
+                                })
+
+                            except Exception as e:
+                                err_msg = f"Error executing {tool_name}: {e}"
+                                yield f"data: {json.dumps({'type': 'error', 'content': err_msg})}\n\n"
+                                messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": tool_call_id,
+                                    "content": str(e)
+                                })
+                                
+                    else:
+                        content = response_message.content
+                        if content:
+                            yield f"data: {json.dumps({'type': 'text_chunk', 'content': content})}\n\n"
+                        break
+            
             # --- OPENAI PATH ---
             elif provider == "openai":
                 messages = [

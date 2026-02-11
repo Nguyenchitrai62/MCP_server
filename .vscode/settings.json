@@ -1,0 +1,7 @@
+{
+  "code-runner.executorMap": {
+    "python": "powershell -NoProfile -ExecutionPolicy Bypass -Command '& { . \".\\.venv\\Scripts\\Activate.ps1\"; python -u $args[0] }'"
+  },
+  "code-runner.runInTerminal": true,
+  "code-runner.saveFileBeforeRun": true
+}
