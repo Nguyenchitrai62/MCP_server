@@ -512,11 +512,19 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
 
                     response = await client.messages.create(**create_args)
 
-                    # Check for tool use
-                    if response.stop_reason == "tool_use":
-                        for tool_use in response.tool_use:
-                            tool_name = tool_use.name
-                            tool_input = tool_use.input
+                    # Check for tool use - in Anthropic SDK, tool_use blocks are in content
+                    tool_use_blocks = [block for block in response.content if hasattr(block, 'type') and block.type == 'tool_use']
+
+                    if tool_use_blocks:
+                        # Append assistant message with tool_use to history
+                        messages_history.append({
+                            "role": "assistant",
+                            "content": response.content
+                        })
+
+                        for tool_block in tool_use_blocks:
+                            tool_name = tool_block.name
+                            tool_input = tool_block.input
 
                             yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'args': tool_input})}\n\n"
                             yield f"data: {json.dumps({'type': 'status', 'content': f'Executing {tool_name}...'})}\n\n"
@@ -541,7 +549,7 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
                                     "content": [
                                         {
                                             "type": "tool_result",
-                                            "tool_use_id": tool_use.id,
+                                            "tool_use_id": tool_block.id,
                                             "content": tool_output,
                                         }
                                     ]
@@ -555,18 +563,19 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
                                     "content": [
                                         {
                                             "type": "tool_result",
-                                            "tool_use_id": tool_use.id,
+                                            "tool_use_id": tool_block.id,
                                             "content": str(e),
                                         }
                                     ]
                                 })
+                        # Continue to next turn to send tool results
+                        continue
 
-                    # Final response
-                    else:
-                        for content_block in response.content:
-                            if content_block.type == "text":
-                                yield f"data: {json.dumps({'type': 'text_chunk', 'content': content_block.text})}\n\n"
-                        break
+                    # Final response - no tool calls
+                    for content_block in response.content:
+                        if content_block.type == "text":
+                            yield f"data: {json.dumps({'type': 'text_chunk', 'content': content_block.text})}\n\n"
+                    break
 
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
