@@ -38,6 +38,13 @@ try:
 except ImportError:
     AsyncGroq = None
 
+try:
+    from anthropic import AsyncAnthropic
+except ImportError:
+    AsyncAnthropic = None
+
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY")
+
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY not set!")
 
@@ -129,14 +136,40 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
          if AsyncGroq is None:
              yield f"data: {json.dumps({'type': 'error', 'content': 'groq module not installed. pip install groq'})}\n\n"
              return
-        
+
          key = api_key or GROQ_API_KEY
          if not key:
              yield f"data: {json.dumps({'type': 'error', 'content': 'GROQ_API_KEY not set'})}\n\n"
              return
-        
+
          client = AsyncGroq(api_key=key)
-         
+
+    elif provider == "anthropic":
+         if AsyncAnthropic is None:
+             yield f"data: {json.dumps({'type': 'error', 'content': 'anthropic module not installed. pip install anthropic'})}\n\n"
+             return
+
+         key = api_key or os.getenv("ANTHROPIC_API_KEY")
+         if not key:
+             yield f"data: {json.dumps({'type': 'error', 'content': 'ANTHROPIC_API_KEY not set'})}\n\n"
+             return
+
+         client = AsyncAnthropic(api_key=key, base_url=base_url)
+
+    elif provider == "minimax":
+         if AsyncAnthropic is None:
+             yield f"data: {json.dumps({'type': 'error', 'content': 'anthropic module not installed. pip install anthropic'})}\n\n"
+             return
+
+         key = api_key or MINIMAX_API_KEY
+         if not key:
+             yield f"data: {json.dumps({'type': 'error', 'content': 'MINIMAX_API_KEY not set'})}\n\n"
+             return
+
+         # MiniMax uses Anthropic-compatible API
+         minimax_base_url = base_url or "https://api.minimax.io/anthropic/v1"
+         client = AsyncAnthropic(api_key=key, base_url=minimax_base_url)
+
     else:
         yield f"data: {json.dumps({'type': 'error', 'content': f'Unknown provider: {provider}'})}\n\n"
         return
@@ -446,7 +479,95 @@ async def chat_process(user_message: str, mcp_urls: List[str], provider: str = "
                         if content:
                             yield f"data: {json.dumps({'type': 'text_chunk', 'content': content})}\n\n"
                         break
-            
+
+            # --- ANTHROPIC/MINIMAX PATH ---
+            elif provider == "anthropic" or provider == "minimax":
+                system_message = "You are a helpful AI assistant. You have access to tools via MCP. Use them when necessary."
+
+                anthropic_tools = []
+                if all_tools:
+                    anthropic_tools = [
+                        {
+                            "name": t.name,
+                            "description": t.description,
+                            "input_schema": t.inputSchema,
+                        }
+                        for t in all_tools
+                    ]
+
+                max_turns = 5
+                messages_history = [{"role": "user", "content": user_message}]
+
+                for _ in range(max_turns):
+                    yield f"data: {json.dumps({'type': 'status', 'content': 'Thinking (Anthropic/MiniMax)...'})}\n\n"
+
+                    create_args = {
+                        "model": model or "claude-haiku-4-5-20251001",
+                        "system": system_message,
+                        "messages": messages_history,
+                        "max_tokens": 4096,
+                    }
+                    if anthropic_tools:
+                        create_args["tools"] = anthropic_tools
+
+                    response = await client.messages.create(**create_args)
+
+                    # Check for tool use
+                    if response.stop_reason == "tool_use":
+                        for tool_use in response.tool_use:
+                            tool_name = tool_use.name
+                            tool_input = tool_use.input
+
+                            yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'args': tool_input})}\n\n"
+                            yield f"data: {json.dumps({'type': 'status', 'content': f'Executing {tool_name}...'})}\n\n"
+
+                            try:
+                                session = tool_to_session.get(tool_name)
+                                if not session:
+                                    raise ValueError(f"No session found for {tool_name}")
+
+                                result = await session.call_tool(tool_name, arguments=tool_input)
+
+                                tool_output = ""
+                                if hasattr(result, 'content') and result.content:
+                                    tool_output = "".join([c.text for c in result.content if hasattr(c, "text")])
+                                else:
+                                    tool_output = str(result)
+
+                                yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'result': tool_output})}\n\n"
+
+                                messages_history.append({
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "tool_result",
+                                            "tool_use_id": tool_use.id,
+                                            "content": tool_output,
+                                        }
+                                    ]
+                                })
+
+                            except Exception as e:
+                                err_msg = f"Error executing {tool_name}: {e}"
+                                yield f"data: {json.dumps({'type': 'error', 'content': err_msg})}\n\n"
+                                messages_history.append({
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "tool_result",
+                                            "tool_use_id": tool_use.id,
+                                            "content": str(e),
+                                        }
+                                    ]
+                                })
+
+                    # Final response
+                    else:
+                        for content_block in response.content:
+                            if content_block.type == "text":
+                                yield f"data: {json.dumps({'type': 'text_chunk', 'content': content_block.text})}\n\n"
+                        break
+
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     except Exception as e:
@@ -506,10 +627,6 @@ async def check_mcp(req: CheckMcpRequest):
          return {"status": "error", "message": "Connection timed out"}
     except Exception as e:
          return {"status": "error", "message": f"Connection failed: {str(e)}"}
-     
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=9000)
