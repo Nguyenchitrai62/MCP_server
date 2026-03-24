@@ -7,3 +7,4 @@ google-genai
 mcp
 openai
 groq
+anthropic
